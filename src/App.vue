@@ -133,10 +133,13 @@
           {{ currentCrypto }}
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
-          <div class="bg-purple-800 border w-10 h-24"></div>
-          <div class="bg-purple-800 border w-10 h-32"></div>
-          <div class="bg-purple-800 border w-10 h-48"></div>
-          <div class="bg-purple-800 border w-10 h-16"></div>
+          <div
+            v-for="(height, idx) of calcGraph()"
+            :key="idx"
+            :style="`height: ${height}%;`"
+            :title="graph[idx]"
+            class="bg-purple-800 border w-10"
+          />
         </div>
         <button
           @click="changeCurrentCrypto(null)"
@@ -176,6 +179,7 @@ export default {
       tickerExist: false,
       variants: ["BTC", "DOGE", "BCH", "CHD"],
       currentCrypto: null,
+      graph: [],
     };
   },
   methods: {
@@ -191,8 +195,9 @@ export default {
     removeTicker(delTicker) {
       this.tickers = this.tickers.filter((ticker) => ticker !== delTicker);
 
-      this.currentCrypto =
-        this.currentCrypto === delTicker.name ? null : this.currentCrypto;
+      if (this.currentCrypto === delTicker.name) {
+        this.changeCurrentCrypto(null);
+      }
     },
     inputChanged() {
       const isExist = this.tickers.some(
@@ -205,11 +210,27 @@ export default {
     },
     changeCurrentCrypto(value) {
       this.currentCrypto = value;
+      this.graph = [];
     },
-    changeTickerValue(name, value) {
+    updateTickerValue(name, value) {
       this.tickers.find((ticker) => ticker.name === name).value =
         value || "Нет данных";
-      console.log(value);
+    },
+    updateGraphValue(value) {
+      this.graph.push(value);
+    },
+    updateCryptoValue(name, value) {
+      this.updateTickerValue(name, value);
+
+      if (this.currentCrypto === name) this.updateGraphValue(value);
+    },
+    calcGraph() {
+      const min = Math.min(...this.graph);
+      const max = Math.max(...this.graph);
+
+      return this.graph.map(
+        (value) => 5 + ((value - min) * 95) / (max - min) || 100
+      );
     },
     async fetchCrypto(name) {
       const cryptoIntervalUpdate = await setInterval(async () => {
@@ -218,10 +239,10 @@ export default {
         )
           .then((response) => response.json())
           .then((data) => {
-            this.changeTickerValue(name, data["USD"]);
+            this.updateCryptoValue(name, data["USD"]);
             !data["USD"] && clearInterval(cryptoIntervalUpdate);
           });
-      }, 2000);
+      }, 500);
     },
   },
 };
