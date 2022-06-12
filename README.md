@@ -1,5 +1,8 @@
 # cryptonomicon
 
+## [Course playlist (youtube)](https://www.youtube.com/playlist?list=PLvTBThJr861yMBhpKafII3HZLAYujuNWw)
+### [Initial layout](https://gitlab.com/vuejs-club/youtube-course/cryptonomicon-html)
+
 ## Project setup
 ```
 yarn install
