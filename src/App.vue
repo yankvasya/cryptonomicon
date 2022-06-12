@@ -107,7 +107,7 @@
             <div class="w-full border-t border-gray-200"></div>
             <button
               class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
-              @click="removeTicker(ticker)"
+              @click.stop="removeTicker(ticker)"
             >
               <svg
                 class="h-5 w-5"
@@ -185,8 +185,11 @@ export default {
       this.tickers.push(ticket);
       this.inputValue = "";
     },
-    removeTicker(dTicker) {
-      this.tickers = this.tickers.filter((ticker) => ticker !== dTicker);
+    removeTicker(delTicker) {
+      this.tickers = this.tickers.filter((ticker) => ticker !== delTicker);
+
+      this.currentCrypto =
+        this.currentCrypto === delTicker.name ? null : this.currentCrypto;
     },
     inputChanged() {
       const isExist = this.tickers.some(
