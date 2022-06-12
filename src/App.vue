@@ -40,6 +40,7 @@
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                 placeholder="Например DOGE"
                 v-model="inputValue"
+                @input="inputChanged"
               />
             </div>
             <div
@@ -66,7 +67,7 @@
                 CHD
               </span>
             </div>
-            <div class="text-sm text-red-600" v-if="false">
+            <div class="text-sm text-red-600" v-if="tickerExist">
               Такой тикер уже добавлен
             </div>
           </div>
@@ -74,6 +75,10 @@
         <button
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          :class="{
+            'pointer-events-none': tickerExist,
+            'opacity-25': tickerExist,
+          }"
           @click="addTicker"
         >
           <!-- Heroicon name: solid/mail -->
@@ -174,17 +179,24 @@ export default {
     return {
       inputValue: "",
       tickers: [],
+      tickerExist: false,
     };
   },
   methods: {
     addTicker() {
-      if (!this.inputValue.trim()) return;
+      if (!this.inputValue.trim() || this.tickerExist) return;
       const ticket = { name: this.inputValue, value: "-" };
       this.tickers.push(ticket);
       this.inputValue = "";
     },
     removeTicker(dTicker) {
       this.tickers = this.tickers.filter((ticker) => ticker !== dTicker);
+    },
+    inputChanged() {
+      const isExist = this.tickers.some(
+        (ticker) => ticker.name === this.inputValue
+      );
+      isExist ? (this.tickerExist = true) : (this.tickerExist = false);
     },
   },
 };
