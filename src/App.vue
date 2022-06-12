@@ -90,9 +90,11 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+            class="bg-white overflow-hidden shadow rounded-lg border-4 border-solid cursor-pointer"
+            :class="{ 'border-purple-800': currentCrypto === ticker.name }"
             v-for="ticker in tickers"
             :key="ticker.name"
+            @click.stop="changeCurrentCrypto(ticker.name)"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
@@ -126,9 +128,9 @@
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section class="relative" v-if="false">
+      <section class="relative" v-if="currentCrypto">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          VUE - USD
+          {{ currentCrypto }}
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div class="bg-purple-800 border w-10 h-24"></div>
@@ -136,7 +138,11 @@
           <div class="bg-purple-800 border w-10 h-48"></div>
           <div class="bg-purple-800 border w-10 h-16"></div>
         </div>
-        <button type="button" class="absolute top-0 right-0">
+        <button
+          @click="changeCurrentCrypto(null)"
+          type="button"
+          class="absolute top-0 right-0"
+        >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="30"
@@ -169,6 +175,7 @@ export default {
       tickers: [],
       tickerExist: false,
       variants: ["BTC", "DOGE", "BCH", "CHD"],
+      currentCrypto: null,
     };
   },
   methods: {
@@ -189,6 +196,9 @@ export default {
     },
     changeInput(value) {
       this.inputValue = value;
+    },
+    changeCurrentCrypto(value) {
+      this.currentCrypto = value;
     },
   },
 };
