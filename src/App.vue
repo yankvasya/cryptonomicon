@@ -48,23 +48,11 @@
             >
               <span
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                v-for="variant in variants"
+                :key="variant"
+                @click="changeInput(variant)"
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
+                {{ variant }}
               </span>
             </div>
             <div class="text-sm text-red-600" v-if="tickerExist">
@@ -180,6 +168,7 @@ export default {
       inputValue: "",
       tickers: [],
       tickerExist: false,
+      variants: ["BTC", "DOGE", "BCH", "CHD"],
     };
   },
   methods: {
@@ -197,6 +186,9 @@ export default {
         (ticker) => ticker.name === this.inputValue
       );
       isExist ? (this.tickerExist = true) : (this.tickerExist = false);
+    },
+    changeInput(value) {
+      this.inputValue = value;
     },
   },
 };
