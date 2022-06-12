@@ -212,11 +212,16 @@ export default {
       console.log(value);
     },
     async fetchCrypto(name) {
-      await fetch(
-        `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD&api_key=e24dd9737529ccb1bd935a2880dfff446401884ff8994e43a2a5695429fba902`
-      )
-        .then((response) => response.json())
-        .then((data) => this.changeTickerValue(name, data["USD"]));
+      const cryptoIntervalUpdate = await setInterval(async () => {
+        await fetch(
+          `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD&api_key=e24dd9737529ccb1bd935a2880dfff446401884ff8994e43a2a5695429fba902`
+        )
+          .then((response) => response.json())
+          .then((data) => {
+            this.changeTickerValue(name, data["USD"]);
+            !data["USD"] && clearInterval(cryptoIntervalUpdate);
+          });
+      }, 2000);
     },
   },
 };
