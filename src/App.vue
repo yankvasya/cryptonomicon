@@ -242,7 +242,7 @@ export default {
             this.updateCryptoValue(name, data["USD"]);
             !data["USD"] && clearInterval(cryptoIntervalUpdate);
           });
-      }, 500);
+      }, 4000);
     },
   },
 };
