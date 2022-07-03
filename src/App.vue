@@ -2,7 +2,7 @@
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div
       class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
-      v-if="false"
+      v-if="!coins"
     >
       <svg
         class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
@@ -45,14 +45,15 @@
             </div>
             <div
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
+              v-if="coinsVariants?.length"
             >
               <span
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-                v-for="variant in variants"
-                :key="variant"
-                @click="changeInput(variant)"
+                v-for="variant in coinsVariants"
+                :key="variant.id"
+                @click="changeInput(variant.symbol)"
               >
-                {{ variant }}
+                {{ variant.symbol }}
               </span>
             </div>
             <div class="text-sm text-red-600" v-if="tickerExist">
@@ -177,10 +178,19 @@ export default {
       inputValue: "",
       tickers: [],
       tickerExist: false,
-      variants: ["BTC", "DOGE", "BCH", "CHD"],
+      coins: null,
       currentCrypto: null,
       graph: [],
     };
+  },
+  computed: {
+    coinsVariants: ({ coins, inputValue }) =>
+      coins &&
+      Object.values(coins)
+        .filter((coin) =>
+          coin.symbol.includes(inputValue.toUpperCase().replace(/( )/g, ""))
+        )
+        .splice(0, 4),
   },
   methods: {
     addTicker() {
@@ -233,6 +243,8 @@ export default {
       );
     },
     async fetchCrypto(name) {
+      // FIXME: Uncaught (in promise) TypeError: can't access property "value", this.tickers.find(...) is undefined
+      // if coin removed
       const cryptoIntervalUpdate = await setInterval(async () => {
         await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD&api_key=e24dd9737529ccb1bd935a2880dfff446401884ff8994e43a2a5695429fba902`
@@ -244,6 +256,15 @@ export default {
           });
       }, 4000);
     },
+  },
+  async mounted() {
+    await fetch(
+      "https://min-api.cryptocompare.com/data/blockchain/list?api_key=e24dd9737529ccb1bd935a2880dfff446401884ff8994e43a2a5695429fba902 "
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        this.coins = data.Data;
+      });
   },
 };
 </script>
