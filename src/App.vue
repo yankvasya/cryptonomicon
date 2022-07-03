@@ -191,6 +191,10 @@ export default {
           coin.symbol.includes(inputValue.toUpperCase().replace(/( )/g, ""))
         )
         .splice(0, 4),
+    takeCurrentTicker:
+      ({ tickers }) =>
+      (name) =>
+        tickers.find((ticker) => ticker.name === name),
   },
   methods: {
     addTicker() {
@@ -223,8 +227,8 @@ export default {
       this.graph = [];
     },
     updateTickerValue(name, value) {
-      this.tickers.find((ticker) => ticker.name === name).value =
-        value || "Нет данных";
+      const currentTicker = this.takeCurrentTicker(name);
+      currentTicker.value = value || "Нет данных";
     },
     updateGraphValue(value) {
       this.graph.push(value);
@@ -243,18 +247,19 @@ export default {
       );
     },
     async fetchCrypto(name) {
-      // FIXME: Uncaught (in promise) TypeError: can't access property "value", this.tickers.find(...) is undefined
-      // if coin removed
       const cryptoIntervalUpdate = await setInterval(async () => {
         await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD&api_key=e24dd9737529ccb1bd935a2880dfff446401884ff8994e43a2a5695429fba902`
         )
           .then((response) => response.json())
           .then((data) => {
-            this.updateCryptoValue(name, data["USD"]);
-            !data["USD"] && clearInterval(cryptoIntervalUpdate);
+            if (this.takeCurrentTicker(name)) {
+              this.updateCryptoValue(name, data["USD"]);
+            } else {
+              clearInterval(cryptoIntervalUpdate);
+            }
           });
-      }, 4000);
+      }, 3000);
     },
   },
   async mounted() {
