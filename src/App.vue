@@ -1,7 +1,7 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div
-      v-if="false"
+      v-if="loading"
       class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
     >
       <svg
@@ -40,43 +40,42 @@
                 id="wallet"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                 placeholder="Например DOGE"
-                @keydown.enter="addTicker"
+                @keydown.enter="addTicker(ticker)"
               />
             </div>
             <div
-              v-if="false"
-              class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
+              v-if="matchingCoins.length"
+              class="flex bg-white p-1 rounded-md shadow-md flex-wrap"
             >
               <span
+                v-for="coin in matchingCoins.slice(0, 4)"
+                :key="coin.symbol"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                @click="addTicker(coin.symbol)"
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-              >
-                CHD
+                {{ coin.symbol }}
               </span>
             </div>
-            <div v-if="false" class="text-sm text-red-600">
+            <div v-if="isTickerAlreadyAdded" class="text-sm text-red-600">
               Такой тикер уже добавлен
+            </div>
+            <div
+              v-if="!isCoinValid && this.ticker"
+              class="text-sm text-red-600"
+            >
+              Такого коина не существует
             </div>
           </div>
         </div>
         <button
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-          @click="addTicker"
+          :class="{
+            'hover:bg-gray-400 bg-gray-400':
+              isTickerAlreadyAdded || !isCoinValid,
+          }"
+          :disabled="isTickerAlreadyAdded || !isCoinValid"
+          @click="addTicker(ticker)"
         >
           <!-- Heroicon name: solid/mail -->
           <svg
@@ -182,33 +181,91 @@
 </template>
 
 <script>
+import axios from "axios";
+
 export default {
   name: "App",
   data() {
     return {
+      coinList: [],
       ticker: "",
       tickers: [],
       sel: null,
       graph: [],
+      loading: false,
     };
   },
+  computed: {
+    tickersNames() {
+      return this.tickers.map(({ name }) => name);
+    },
+    matchingCoins() {
+      return this.ticker
+        ? this.coinList.filter(
+            (coin) =>
+              coin.symbol.includes(this.ticker.toUpperCase()) &&
+              !this.tickersNames.includes(coin.symbol)
+          )
+        : [];
+    },
+    isTickerAlreadyAdded() {
+      return this.tickersNames.includes(this.ticker.toUpperCase());
+    },
+    isCoinValid() {
+      return this.coinList.some(
+        (coin) => coin.symbol === this.ticker.toUpperCase()
+      );
+    },
+  },
   methods: {
-    addTicker() {
-      const currentTicker = { name: this.ticker, price: null };
+    async fetchCoinList() {
+      try {
+        this.loading = true;
+
+        const response = await axios.get(
+          "https://min-api.cryptocompare.com/data/blockchain/list",
+          {
+            headers: {
+              Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
+            },
+          }
+        );
+        this.coinList = Object.values(response.data.Data);
+      } finally {
+        this.loading = false;
+      }
+    },
+    addTicker(value) {
+      if (
+        this.ticker === value &&
+        (this.isTickerAlreadyAdded || !this.isCoinValid)
+      )
+        return;
+      const currentTicker = { name: value.toUpperCase(), price: null };
       this.tickers.push(currentTicker);
       this.getPriceInterval(currentTicker.name);
       this.ticker = "";
     },
     getPriceInterval(name) {
       const interval = setInterval(async () => {
-        const response = await fetch(
-          `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD`
+        const response = await axios.get(
+          `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD`,
+          {
+            headers: {
+              Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
+            },
+          }
         );
-        const price = await response.json();
-        console.log(price);
-        if (!price?.USD) return clearInterval(interval);
+        const price = response.data;
+        const currentTicker = this.tickers.find((t) => t.name === name);
 
-        this.tickers.find((t) => t.name === name).price =
+        if (!price?.USD && currentTicker) {
+          currentTicker.price = "Error";
+        }
+
+        if (!price?.USD || !currentTicker) return clearInterval(interval);
+
+        currentTicker.price =
           price.USD > 1 ? price.USD.toFixed(2) : price.USD.toPrecision(2);
         if (this.sel?.name === name) this.graph.push(price.USD);
       }, 3000);
@@ -232,6 +289,9 @@ export default {
         (value) => 5 + ((value - minValue) * 95) / (maxValue - minValue)
       );
     },
+  },
+  async mounted() {
+    await this.fetchCoinList();
   },
 };
 </script>
