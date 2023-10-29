@@ -183,6 +183,9 @@
 <script>
 import axios from "axios";
 
+const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
+const ALL_COINS_LIST = "ALL_COINS_LIST";
+
 export default {
   name: "App",
   data() {
@@ -231,6 +234,7 @@ export default {
           }
         );
         this.coinList = Object.values(response.data.Data);
+        localStorage.setItem(ALL_COINS_LIST, JSON.stringify(this.coinList));
       } finally {
         this.loading = false;
       }
@@ -245,6 +249,10 @@ export default {
       this.tickers.push(currentTicker);
       this.getPriceInterval(currentTicker.name);
       this.ticker = "";
+      localStorage.setItem(
+        CURRENT_SELECTED_TICKERS,
+        JSON.stringify(this.tickers)
+      );
     },
     getPriceInterval(name) {
       const interval = setInterval(async () => {
@@ -291,7 +299,21 @@ export default {
     },
   },
   async mounted() {
-    await this.fetchCoinList();
+    const savedCoinsList = localStorage.getItem(ALL_COINS_LIST);
+    const savedSelectedTickers = localStorage.getItem(CURRENT_SELECTED_TICKERS);
+
+    if (savedCoinsList) {
+      this.coinList = JSON.parse(savedCoinsList);
+    } else {
+      await this.fetchCoinList();
+    }
+
+    if (savedSelectedTickers) {
+      this.tickers = JSON.parse(savedSelectedTickers);
+      for (const ticker of this.tickers) {
+        this.getPriceInterval(ticker.name);
+      }
+    }
   },
 };
 </script>
