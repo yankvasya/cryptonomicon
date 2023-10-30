@@ -71,8 +71,7 @@
           type="button"
           class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           :class="{
-            'hover:bg-gray-400 bg-gray-400':
-              isTickerAlreadyAdded || !isCoinValid,
+            'pointer-events-none': isTickerAlreadyAdded || !isCoinValid,
           }"
           :disabled="isTickerAlreadyAdded || !isCoinValid"
           @click="addTicker(ticker)"
@@ -92,13 +91,48 @@
           </svg>
           Добавить
         </button>
+        <div class="mt-1 flex">
+          <div class="mx-2">
+            <label for="filter" class="block text-sm font-medium text-gray-700"
+              >Фильтр</label
+            >
+            <div class="mt-1 relative rounded-md shadow-md">
+              <input
+                :value="filter"
+                type="text"
+                name="filter"
+                id="filter"
+                class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
+                @input="(event) => updateFilter(event.target.value)"
+              />
+            </div>
+          </div>
+        </div>
+        <div v-if="tickers.length" class="mt-1 flex gap-2">
+          <button
+            v-if="displayPrevPage"
+            type="button"
+            class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            @click="page = page - 1"
+          >
+            Назад
+          </button>
+          <button
+            v-if="displayNextPage"
+            type="button"
+            class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            @click="page = page + 1"
+          >
+            Вперед
+          </button>
+        </div>
       </section>
 
-      <template v-if="tickers.length">
+      <template v-if="filteredTickers.length">
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in tickers"
+            v-for="t in paginatedTickers"
             :key="t.name"
             :class="{
               'border-4': this.sel?.name === t.name,
@@ -185,6 +219,7 @@ import axios from "axios";
 
 const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
+const TICKERS_PER_PAGE = 6;
 
 export default {
   name: "App",
@@ -196,9 +231,20 @@ export default {
       sel: null,
       graph: [],
       loading: false,
+      filter: "",
+      page: 1,
     };
   },
   computed: {
+    displayPrevPage() {
+      return this.page > 1;
+    },
+    displayNextPage() {
+      return (
+        this.paginatedTickers.length >= TICKERS_PER_PAGE &&
+        this.filteredTickers.length > TICKERS_PER_PAGE * this.page
+      );
+    },
     tickersNames() {
       return this.tickers.map(({ name }) => name);
     },
@@ -217,6 +263,17 @@ export default {
     isCoinValid() {
       return this.coinList.some(
         (coin) => coin.symbol === this.ticker.toUpperCase()
+      );
+    },
+    filteredTickers() {
+      return this.tickers.filter(({ name }) =>
+        name.includes(this.filter.toUpperCase())
+      );
+    },
+    paginatedTickers() {
+      return this.filteredTickers.slice(
+        (this.page - 1) * TICKERS_PER_PAGE,
+        this.page * TICKERS_PER_PAGE
       );
     },
   },
@@ -249,6 +306,7 @@ export default {
       this.tickers.push(currentTicker);
       this.getPriceInterval(currentTicker.name);
       this.ticker = "";
+      this.filter = "";
       localStorage.setItem(
         CURRENT_SELECTED_TICKERS,
         JSON.stringify(this.tickers)
@@ -256,6 +314,12 @@ export default {
     },
     getPriceInterval(name) {
       const interval = setInterval(async () => {
+        const isTickerDisplayed = this.filteredTickers.some(
+          (ticker) => ticker.name === name
+        );
+
+        if (!isTickerDisplayed) return;
+
         const response = await axios.get(
           `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD`,
           {
@@ -265,7 +329,9 @@ export default {
           }
         );
         const price = response.data;
-        const currentTicker = this.tickers.find((t) => t.name === name);
+        const currentTicker = this.tickers.find(
+          (ticker) => ticker.name === name
+        );
 
         if (!price?.USD && currentTicker) {
           currentTicker.price = "Error";
@@ -281,6 +347,10 @@ export default {
     removeTicker(t) {
       if (this.sel?.name === t.name) this.sel = null;
       this.tickers = this.tickers.filter(({ name }) => name !== t.name);
+      localStorage.setItem(
+        CURRENT_SELECTED_TICKERS,
+        JSON.stringify(this.tickers)
+      );
     },
     toggleSelectTicker(t) {
       this.sel = this.sel?.name === t.name ? null : t;
@@ -297,10 +367,27 @@ export default {
         (value) => 5 + ((value - minValue) * 95) / (maxValue - minValue)
       );
     },
+    updateQueryURL() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+      );
+    },
+    updateFilter(value) {
+      this.filter = value;
+      this.page = 1;
+    },
   },
   async mounted() {
     const savedCoinsList = localStorage.getItem(ALL_COINS_LIST);
     const savedSelectedTickers = localStorage.getItem(CURRENT_SELECTED_TICKERS);
+    const { page, filter } = Object.fromEntries(
+      new URLSearchParams(window.location.search)
+    );
+
+    this.page = +page || this.page;
+    this.filter = filter || this.filter;
 
     if (savedCoinsList) {
       this.coinList = JSON.parse(savedCoinsList);
@@ -314,6 +401,14 @@ export default {
         this.getPriceInterval(ticker.name);
       }
     }
+  },
+  watch: {
+    filter() {
+      this.updateQueryURL();
+    },
+    page() {
+      this.updateQueryURL();
+    },
   },
 };
 </script>
