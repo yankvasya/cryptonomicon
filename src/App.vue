@@ -34,21 +34,21 @@
             >
             <div class="mt-1 relative rounded-md shadow-md">
               <input
-                v-model="ticker"
+                v-model="tickerValue"
                 type="text"
                 name="wallet"
                 id="wallet"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
                 placeholder="Например DOGE"
-                @keydown.enter="addTicker(ticker)"
+                @keydown.enter="addTicker(tickerValue)"
               />
             </div>
             <div
-              v-if="matchingCoins.length"
+              v-if="matchedCoins.length"
               class="flex bg-white p-1 rounded-md shadow-md flex-wrap"
             >
               <span
-                v-for="coin in matchingCoins.slice(0, 4)"
+                v-for="coin in matchedCoins.slice(0, 4)"
                 :key="coin.symbol"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
                 @click="addTicker(coin.symbol)"
@@ -60,7 +60,7 @@
               Такой тикер уже добавлен
             </div>
             <div
-              v-if="!isCoinValid && this.ticker"
+              v-if="!isCoinValid && tickerValue"
               class="text-sm text-red-600"
             >
               Такого коина не существует
@@ -74,7 +74,7 @@
             'pointer-events-none': isTickerAlreadyAdded || !isCoinValid,
           }"
           :disabled="isTickerAlreadyAdded || !isCoinValid"
-          @click="addTicker(ticker)"
+          @click="addTicker(tickerValue)"
         >
           <!-- Heroicon name: solid/mail -->
           <svg
@@ -98,19 +98,18 @@
             >
             <div class="mt-1 relative rounded-md shadow-md">
               <input
-                :value="filter"
+                v-model="filter"
                 type="text"
                 name="filter"
                 id="filter"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
-                @input="(event) => updateFilter(event.target.value)"
               />
             </div>
           </div>
         </div>
         <div v-if="tickers.length" class="mt-1 flex gap-2">
           <button
-            v-if="displayPrevPage"
+            v-if="hasPrevPage"
             type="button"
             class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             @click="page = page - 1"
@@ -118,7 +117,7 @@
             Назад
           </button>
           <button
-            v-if="displayNextPage"
+            v-if="hasNextPage"
             type="button"
             class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
             @click="page = page + 1"
@@ -132,26 +131,26 @@
         <hr class="w-full border-t border-gray-600 my-4" />
         <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <div
-            v-for="t in paginatedTickers"
-            :key="t.name"
+            v-for="ticker in paginatedTickers"
+            :key="ticker.name"
             :class="{
-              'border-4': this.sel?.name === t.name,
+              'border-4': selectedTicker?.name === ticker.name,
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-            @click="toggleSelectTicker(t)"
+            @click="toggleSelectTicker(ticker)"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
               <dt class="text-sm font-medium text-gray-500 truncate">
-                {{ t.name }} - USD
+                {{ ticker.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price ?? "-" }}
+                {{ ticker.price ?? "-" }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
             <button
               class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
-              @click.stop="removeTicker(t)"
+              @click.stop="removeTicker(ticker)"
             >
               <svg
                 class="h-5 w-5"
@@ -172,13 +171,13 @@
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
 
-      <section v-if="sel" class="relative">
+      <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-          {{ sel.name }} - USD
+          {{ selectedTicker.name }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, index) in normalizeGraph()"
+            v-for="(bar, index) in normalizedGraph"
             :key="index"
             :style="{
               height: `${bar}%`,
@@ -225,44 +224,45 @@ export default {
   name: "App",
   data() {
     return {
-      coinList: [],
-      ticker: "",
-      tickers: [],
-      sel: null,
-      graph: [],
-      loading: false,
+      tickerValue: "",
       filter: "",
       page: 1,
+      coinList: [],
+      tickers: [],
+      graph: [],
+      selectedTicker: null,
+      loading: false,
     };
   },
   computed: {
-    displayPrevPage() {
+    hasPrevPage() {
       return this.page > 1;
     },
-    displayNextPage() {
-      return (
-        this.paginatedTickers.length >= TICKERS_PER_PAGE &&
-        this.filteredTickers.length > TICKERS_PER_PAGE * this.page
-      );
+    hasNextPage() {
+      return this.filteredTickers.length > TICKERS_PER_PAGE * this.page;
+    },
+    startTickerIndex() {
+      return (this.page - 1) * TICKERS_PER_PAGE;
+    },
+    endTickerIndex() {
+      return this.page * TICKERS_PER_PAGE;
     },
     tickersNames() {
       return this.tickers.map(({ name }) => name);
     },
-    matchingCoins() {
-      return this.ticker
-        ? this.coinList.filter(
-            (coin) =>
-              coin.symbol.includes(this.ticker.toUpperCase()) &&
-              !this.tickersNames.includes(coin.symbol)
-          )
-        : [];
+    matchedCoins() {
+      return this.coinList.filter(
+        (coin) =>
+          coin.symbol.includes(this.tickerValue.toUpperCase()) &&
+          !this.tickersNames.includes(coin.symbol)
+      );
     },
     isTickerAlreadyAdded() {
-      return this.tickersNames.includes(this.ticker.toUpperCase());
+      return this.tickersNames.includes(this.tickerValue.toUpperCase());
     },
     isCoinValid() {
       return this.coinList.some(
-        (coin) => coin.symbol === this.ticker.toUpperCase()
+        (coin) => coin.symbol === this.tickerValue.toUpperCase()
       );
     },
     filteredTickers() {
@@ -272,45 +272,60 @@ export default {
     },
     paginatedTickers() {
       return this.filteredTickers.slice(
-        (this.page - 1) * TICKERS_PER_PAGE,
-        this.page * TICKERS_PER_PAGE
+        this.startTickerIndex,
+        this.endTickerIndex
+      );
+    },
+    normalizedGraph() {
+      const maxValue = Math.max(...this.graph);
+      const minValue = Math.min(...this.graph);
+
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50);
+      }
+
+      return this.graph.map(
+        (value) => 5 + ((value - minValue) * 95) / (maxValue - minValue)
+      );
+    },
+    queryOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
+    stringQueryOptions() {
+      return Object.entries(this.queryOptions).reduce(
+        (prev, [option, value], index) =>
+          (prev += `${index ? "&" : ""}${option}=${value}`),
+        ""
       );
     },
   },
   methods: {
     async fetchCoinList() {
-      try {
-        this.loading = true;
+      this.loading = true;
 
-        const response = await axios.get(
-          "https://min-api.cryptocompare.com/data/blockchain/list",
-          {
-            headers: {
-              Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
-            },
-          }
-        );
-        this.coinList = Object.values(response.data.Data);
-        localStorage.setItem(ALL_COINS_LIST, JSON.stringify(this.coinList));
-      } finally {
-        this.loading = false;
-      }
+      return await axios
+        .get("https://min-api.cryptocompare.com/data/blockchain/list", {
+          headers: {
+            Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
+          },
+        })
+        .then((response) => Object.values(response.data.Data))
+        .finally(() => (this.loading = false));
     },
     addTicker(value) {
       if (
-        this.ticker === value &&
+        this.tickerValue === value &&
         (this.isTickerAlreadyAdded || !this.isCoinValid)
       )
         return;
       const currentTicker = { name: value.toUpperCase(), price: null };
-      this.tickers.push(currentTicker);
+      this.tickers = [...this.tickers, currentTicker];
       this.getPriceInterval(currentTicker.name);
-      this.ticker = "";
+      this.tickerValue = "";
       this.filter = "";
-      localStorage.setItem(
-        CURRENT_SELECTED_TICKERS,
-        JSON.stringify(this.tickers)
-      );
     },
     getPriceInterval(name) {
       const interval = setInterval(async () => {
@@ -334,53 +349,41 @@ export default {
         );
 
         if (!price?.USD && currentTicker) {
-          currentTicker.price = "Error";
+          currentTicker.price = "No data";
         }
 
         if (!price?.USD || !currentTicker) return clearInterval(interval);
 
         currentTicker.price =
           price.USD > 1 ? price.USD.toFixed(2) : price.USD.toPrecision(2);
-        if (this.sel?.name === name) this.graph.push(price.USD);
+        if (this.selectedTicker?.name === name) {
+          this.graph = [...this.graph, price.USD];
+        }
       }, 3000);
     },
-    removeTicker(t) {
-      if (this.sel?.name === t.name) this.sel = null;
-      this.tickers = this.tickers.filter(({ name }) => name !== t.name);
-      localStorage.setItem(
-        CURRENT_SELECTED_TICKERS,
-        JSON.stringify(this.tickers)
-      );
+    removeTicker(ticker) {
+      if (this.selectedTicker?.name === ticker.name) {
+        this.selectedTicker = null;
+      }
+      this.tickers = this.tickers.filter(({ name }) => name !== ticker.name);
     },
-    toggleSelectTicker(t) {
-      this.sel = this.sel?.name === t.name ? null : t;
-      this.graph = [];
+    toggleSelectTicker(ticker) {
+      this.selectedTicker =
+        this.selectedTicker?.name === ticker.name ? null : ticker;
     },
     unselectTicker() {
-      this.sel = null;
-      this.graph = [];
-    },
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph);
-      const minValue = Math.min(...this.graph);
-      return this.graph.map(
-        (value) => 5 + ((value - minValue) * 95) / (maxValue - minValue)
-      );
+      this.selectedTicker = null;
     },
     updateQueryURL() {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+        `${window.location.pathname}?${this.stringQueryOptions}`
       );
-    },
-    updateFilter(value) {
-      this.filter = value;
-      this.page = 1;
     },
   },
   async mounted() {
-    const savedCoinsList = localStorage.getItem(ALL_COINS_LIST);
+    const savedCoinsList = JSON.parse(localStorage.getItem(ALL_COINS_LIST));
     const savedSelectedTickers = localStorage.getItem(CURRENT_SELECTED_TICKERS);
     const { page, filter } = Object.fromEntries(
       new URLSearchParams(window.location.search)
@@ -389,11 +392,7 @@ export default {
     this.page = +page || this.page;
     this.filter = filter || this.filter;
 
-    if (savedCoinsList) {
-      this.coinList = JSON.parse(savedCoinsList);
-    } else {
-      await this.fetchCoinList();
-    }
+    this.coinList = savedCoinsList ?? (await this.fetchCoinList());
 
     if (savedSelectedTickers) {
       this.tickers = JSON.parse(savedSelectedTickers);
@@ -404,10 +403,27 @@ export default {
   },
   watch: {
     filter() {
+      this.page = 1;
+    },
+    selectedTicker() {
+      this.graph = [];
+    },
+    queryOptions() {
       this.updateQueryURL();
     },
-    page() {
-      this.updateQueryURL();
+    tickers() {
+      localStorage.setItem(
+        CURRENT_SELECTED_TICKERS,
+        JSON.stringify(this.tickers)
+      );
+    },
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) {
+        this.page = this.page - 1;
+      }
+    },
+    coinList() {
+      localStorage.setItem(ALL_COINS_LIST, JSON.stringify(this.coinList));
     },
   },
 };
