@@ -1,6 +1,10 @@
 # cryptonomicon
 
 ## Project setup
+- node **14.20.0**
+- npm **6.14.17**
+- yarn **1.22.19**
+
 ```
 npm install
 ```
