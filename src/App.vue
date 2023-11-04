@@ -144,7 +144,7 @@
                 {{ ticker.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ ticker.price ?? "-" }}
+                {{ formatPrice(ticker.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -219,6 +219,7 @@ import { Api } from "@/api";
 const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
 const TICKERS_PER_PAGE = 6;
+const PRICE_NULL = "No Info";
 
 export default {
   name: "App",
@@ -232,7 +233,6 @@ export default {
       graph: [],
       selectedTicker: null,
       loading: false,
-      isIntervalUpdateEnable: false,
     };
   },
   computed: {
@@ -304,6 +304,13 @@ export default {
     },
   },
   methods: {
+    formatPrice(price) {
+      return !price
+        ? PRICE_NULL
+        : price > 1
+        ? price.toFixed(2)
+        : price.toPrecision(2);
+    },
     async fetchCoinList() {
       this.loading = true;
 
@@ -321,48 +328,30 @@ export default {
       this.tickers = [...this.tickers, currentTicker];
       this.tickerValue = "";
       this.filter = "";
+      this.subscribeToUpdatePrice(currentTicker.name);
     },
-    intervalUpdatePrices() {
-      const interval = setInterval(async () => {
-        if (!this.tickers.length) {
-          this.isIntervalUpdateEnable = false;
-          return clearInterval(interval);
-        }
-
-        const updatedCoinsPrices = await Api.getCoinsPrices(
-          this.tickersNames
-        ).then((response) => response.data);
+    subscribeToUpdatePrice(tickerName) {
+      Api.subscribeUpdateCoin(tickerName, (updatedCoin) => {
+        const { name, price } = updatedCoin;
 
         this.tickers = this.tickers.map((ticker) => {
-          const PRICE_NULL = "No Info";
-          const updatedCoinPrices = updatedCoinsPrices[ticker.name];
-
-          const price = !updatedCoinPrices?.USD
-            ? PRICE_NULL
-            : updatedCoinPrices.USD > 1
-            ? updatedCoinPrices.USD.toFixed(2)
-            : updatedCoinPrices.USD.toPrecision(2);
-
-          if (
-            this.selectedTicker &&
-            this.selectedTicker.name === ticker.name &&
-            updatedCoinPrices?.USD
-          ) {
-            this.graph = [...this.graph, updatedCoinPrices.USD];
-          }
-
           return {
             ...ticker,
-            price,
+            price: ticker.name === name ? price : ticker.price,
           };
         });
-      }, 3000);
+
+        if (this.selectedTicker && this.selectedTicker.name === name && price) {
+          this.graph = [...this.graph, price];
+        }
+      });
     },
     removeTicker(ticker) {
       if (this.selectedTicker?.name === ticker.name) {
         this.selectedTicker = null;
       }
       this.tickers = this.tickers.filter(({ name }) => name !== ticker.name);
+      Api.unsubscribeUpdateCoin(ticker.name);
     },
     toggleSelectTicker(ticker) {
       this.selectedTicker =
@@ -394,6 +383,10 @@ export default {
     if (savedSelectedTickers) {
       this.tickers = JSON.parse(savedSelectedTickers);
     }
+
+    for (const ticker of this.tickers) {
+      this.subscribeToUpdatePrice(ticker.name);
+    }
   },
   watch: {
     filter() {
@@ -410,11 +403,6 @@ export default {
         CURRENT_SELECTED_TICKERS,
         JSON.stringify(this.tickers)
       );
-
-      if (!this.isIntervalUpdateEnable && this.tickers.length) {
-        this.isIntervalUpdateEnable = true;
-        this.intervalUpdatePrices();
-      }
     },
     paginatedTickers() {
       if (this.paginatedTickers.length === 0 && this.page > 1) {
