@@ -214,7 +214,7 @@
 </template>
 
 <script>
-import axios from "axios";
+import { Api } from "@/api";
 
 const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
@@ -232,6 +232,7 @@ export default {
       graph: [],
       selectedTicker: null,
       loading: false,
+      isIntervalUpdateEnable: false,
     };
   },
   computed: {
@@ -306,12 +307,7 @@ export default {
     async fetchCoinList() {
       this.loading = true;
 
-      return await axios
-        .get("https://min-api.cryptocompare.com/data/blockchain/list", {
-          headers: {
-            Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
-          },
-        })
+      return await Api.getCoinsList()
         .then((response) => Object.values(response.data.Data))
         .finally(() => (this.loading = false));
     },
@@ -323,42 +319,43 @@ export default {
         return;
       const currentTicker = { name: value.toUpperCase(), price: null };
       this.tickers = [...this.tickers, currentTicker];
-      this.getPriceInterval(currentTicker.name);
       this.tickerValue = "";
       this.filter = "";
     },
-    getPriceInterval(name) {
+    intervalUpdatePrices() {
       const interval = setInterval(async () => {
-        const isTickerDisplayed = this.filteredTickers.some(
-          (ticker) => ticker.name === name
-        );
+        if (!this.tickers.length) {
+          this.isIntervalUpdateEnable = false;
+          return clearInterval(interval);
+        }
 
-        if (!isTickerDisplayed) return;
+        const updatedCoinsPrices = await Api.getCoinsPrices(
+          this.tickersNames
+        ).then((response) => response.data);
 
-        const response = await axios.get(
-          `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=USD`,
-          {
-            headers: {
-              Authorization: `Apikey ${process.env.VUE_APP_CRYPTO_TOKEN}`,
-            },
+        this.tickers = this.tickers.map((ticker) => {
+          const PRICE_NULL = "No Info";
+          const updatedCoinPrices = updatedCoinsPrices[ticker.name];
+
+          const price = !updatedCoinPrices?.USD
+            ? PRICE_NULL
+            : updatedCoinPrices.USD > 1
+            ? updatedCoinPrices.USD.toFixed(2)
+            : updatedCoinPrices.USD.toPrecision(2);
+
+          if (
+            this.selectedTicker &&
+            this.selectedTicker.name === ticker.name &&
+            updatedCoinPrices?.USD
+          ) {
+            this.graph = [...this.graph, updatedCoinPrices.USD];
           }
-        );
-        const price = response.data;
-        const currentTicker = this.tickers.find(
-          (ticker) => ticker.name === name
-        );
 
-        if (!price?.USD && currentTicker) {
-          currentTicker.price = "No data";
-        }
-
-        if (!price?.USD || !currentTicker) return clearInterval(interval);
-
-        currentTicker.price =
-          price.USD > 1 ? price.USD.toFixed(2) : price.USD.toPrecision(2);
-        if (this.selectedTicker?.name === name) {
-          this.graph = [...this.graph, price.USD];
-        }
+          return {
+            ...ticker,
+            price,
+          };
+        });
       }, 3000);
     },
     removeTicker(ticker) {
@@ -396,9 +393,6 @@ export default {
 
     if (savedSelectedTickers) {
       this.tickers = JSON.parse(savedSelectedTickers);
-      for (const ticker of this.tickers) {
-        this.getPriceInterval(ticker.name);
-      }
     }
   },
   watch: {
@@ -416,6 +410,11 @@ export default {
         CURRENT_SELECTED_TICKERS,
         JSON.stringify(this.tickers)
       );
+
+      if (!this.isIntervalUpdateEnable && this.tickers.length) {
+        this.isIntervalUpdateEnable = true;
+        this.intervalUpdatePrices();
+      }
     },
     paginatedTickers() {
       if (this.paginatedTickers.length === 0 && this.page > 1) {
