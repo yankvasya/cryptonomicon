@@ -134,9 +134,11 @@
             v-for="ticker in paginatedTickers"
             :key="ticker.name"
             :class="{
-              'border-4': selectedTicker?.name === ticker.name,
+              'border-purple-800': selectedTicker?.name === ticker.name,
+              'bg-red-100': ticker.price === 0,
+              'bg-white': ticker.price !== 0,
             }"
-            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+            class="overflow-hidden shadow rounded-lg border-4 border-solid cursor-pointer"
             @click="toggleSelectTicker(ticker)"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -219,7 +221,7 @@ import { Api } from "@/api";
 const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
 const TICKERS_PER_PAGE = 6;
-const PRICE_NULL = "No Info";
+const PRICE_NO_DATA = "-";
 
 export default {
   name: "App",
@@ -305,11 +307,11 @@ export default {
   },
   methods: {
     formatPrice(price) {
-      return !price
-        ? PRICE_NULL
-        : price > 1
-        ? price.toFixed(2)
-        : price.toPrecision(2);
+      if (!price) {
+        return PRICE_NO_DATA;
+      }
+
+      return price > 1 ? price.toFixed(2) : price.toPrecision(2);
     },
     async fetchCoinList() {
       this.loading = true;

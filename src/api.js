@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const AGGREGATE_INDEX = "5";
+const INVALID_SUB = "500";
 const WEBSOCKET_OPEN_STATE = 1;
 const coinsWebsocketUrl = `wss://streamer.cryptocompare.com/v2?api_key=${process.env.VUE_APP_CRYPTO_TOKEN}`;
 const websocket = new WebSocket(coinsWebsocketUrl);
@@ -18,22 +19,13 @@ export const Api = {
       }
     );
   },
-  subscribeUpdateCoin: (name, callback) => {
-    const callbacks = subscribedCoinsToUpdate.get(name) ?? [];
-    const hasSubscribes = subscribedCoinsToUpdate.has(name);
-
-    subscribedCoinsToUpdate.set(name, [...callbacks, callback]);
-
-    const stringifyMessage = JSON.stringify({
-      action: "SubAdd",
-      subs: [`5~CCCAGG~${name}~USD`],
-    });
-    if (hasSubscribes) return;
-
+  sendMessageToSocket(params) {
+    const stringifyMessage = JSON.stringify(params);
     if (websocket.readyState === WEBSOCKET_OPEN_STATE) {
       websocket.send(stringifyMessage);
       return;
     }
+
     websocket.addEventListener(
       "open",
       () => {
@@ -42,25 +34,41 @@ export const Api = {
       { once: true }
     );
   },
+  subscribeUpdateCoin: (name, callback) => {
+    const callbacks = subscribedCoinsToUpdate.get(name) ?? [];
+    const message = {
+      action: "SubAdd",
+      subs: [`5~CCCAGG~${name}~USD`],
+    };
+
+    subscribedCoinsToUpdate.set(name, [...callbacks, callback]);
+    Api.sendMessageToSocket(message);
+  },
   unsubscribeUpdateCoin: (name) => {
-    const stringifyMessage = JSON.stringify({
+    const message = {
       action: "SubRemove",
       subs: [`5~CCCAGG~${name}~USD`],
-    });
+    };
     subscribedCoinsToUpdate.delete(name);
-
-    websocket.send(stringifyMessage);
+    Api.sendMessageToSocket(message);
   },
 };
 
 websocket.addEventListener("message", (event) => {
-  const { TYPE, FROMSYMBOL, TOSYMBOL, PRICE } = JSON.parse(event.data);
-  if (TYPE !== AGGREGATE_INDEX) return;
+  const { TYPE, FROMSYMBOL, TOSYMBOL, PRICE, PARAMETER } = JSON.parse(
+    event.data
+  );
+  if (![AGGREGATE_INDEX, INVALID_SUB].includes(TYPE)) return;
 
-  subscribedCoinsToUpdate.get(FROMSYMBOL)?.map((callback) =>
+  const coinNameParametr = PARAMETER?.split("~")[2];
+  const currentCoinName =
+    TYPE === AGGREGATE_INDEX ? FROMSYMBOL : coinNameParametr;
+  const callbacks = subscribedCoinsToUpdate.get(currentCoinName) || [];
+
+  callbacks.map((callback) =>
     callback({
-      name: FROMSYMBOL,
-      price: +PRICE,
+      name: currentCoinName,
+      price: TYPE !== INVALID_SUB ? +PRICE : 0,
       exchange: TOSYMBOL,
     })
   );
