@@ -1,5 +1,8 @@
 <template>
-  <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
+  <div
+    ref="container"
+    class="container mx-auto flex flex-col items-center bg-gray-100 p-4"
+  >
     <div
       v-if="loading"
       class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
@@ -179,12 +182,13 @@
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(bar, index) in normalizedGraph"
+            v-for="(bar, index) in calculatedGraph"
             :key="index"
             :style="{
               height: `${bar}%`,
+              'min-width': `${GRAPH_BAR_WIDTH}px`,
             }"
-            class="bg-purple-800 border w-10"
+            class="bg-purple-800 border"
           ></div>
         </div>
         <button
@@ -222,6 +226,7 @@ const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
 const TICKERS_PER_PAGE = 6;
 const PRICE_NO_DATA = "-";
+const GRAPH_BAR_WIDTH = 40;
 
 export default {
   name: "App",
@@ -230,11 +235,13 @@ export default {
       tickerValue: "",
       filter: "",
       page: 1,
+      maxGraphElements: 0,
       coinList: [],
       tickers: [],
       graph: [],
       selectedTicker: null,
       loading: false,
+      GRAPH_BAR_WIDTH,
     };
   },
   computed: {
@@ -291,6 +298,10 @@ export default {
         (value) => 5 + ((value - minValue) * 95) / (maxValue - minValue)
       );
     },
+    calculatedGraph() {
+      const sliceValue = this.normalizedGraph.length - this.maxGraphElements;
+      return this.normalizedGraph.slice(sliceValue > 0 ? sliceValue : 0);
+    },
     queryOptions() {
       return {
         filter: this.filter,
@@ -306,6 +317,10 @@ export default {
     },
   },
   methods: {
+    handlerWindowResize() {
+      this.maxGraphElements =
+        Math.trunc(this.$refs.container.offsetWidth / this.GRAPH_BAR_WIDTH) - 1;
+    },
     formatPrice(price) {
       if (!price) {
         return PRICE_NO_DATA;
@@ -371,6 +386,9 @@ export default {
     },
   },
   async mounted() {
+    this.handlerWindowResize();
+    window.addEventListener("resize", this.handlerWindowResize);
+
     const savedCoinsList = JSON.parse(localStorage.getItem(ALL_COINS_LIST));
     const savedSelectedTickers = localStorage.getItem(CURRENT_SELECTED_TICKERS);
     const { page, filter } = Object.fromEntries(
