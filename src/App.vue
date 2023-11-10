@@ -1,8 +1,5 @@
 <template>
-  <div
-    ref="container"
-    class="container mx-auto flex flex-col items-center bg-gray-100 p-4"
-  >
+  <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div
       v-if="loading"
       class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
@@ -180,7 +177,10 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+          class="flex items-end border-gray-600 border-b border-l h-64"
+          ref="graph"
+        >
           <div
             v-for="(bar, index) in calculatedGraph"
             :key="index"
@@ -221,6 +221,7 @@
 
 <script>
 import { Api } from "@/api";
+import { nextTick } from "vue";
 
 const CURRENT_SELECTED_TICKERS = "CURRENT_SELECTED_TICKERS";
 const ALL_COINS_LIST = "ALL_COINS_LIST";
@@ -317,9 +318,14 @@ export default {
     },
   },
   methods: {
-    handlerWindowResize() {
-      this.maxGraphElements =
-        Math.trunc(this.$refs.container.offsetWidth / this.GRAPH_BAR_WIDTH) - 1;
+    calculateGraphElementsMaxAmount() {
+      if (!this.$refs.graph) {
+        return;
+      }
+
+      this.maxGraphElements = Math.trunc(
+        this.$refs.graph.offsetWidth / this.GRAPH_BAR_WIDTH
+      );
     },
     formatPrice(price) {
       if (!price) {
@@ -386,8 +392,7 @@ export default {
     },
   },
   async mounted() {
-    this.handlerWindowResize();
-    window.addEventListener("resize", this.handlerWindowResize);
+    window.addEventListener("resize", this.calculateGraphElementsMaxAmount);
 
     const savedCoinsList = JSON.parse(localStorage.getItem(ALL_COINS_LIST));
     const savedSelectedTickers = localStorage.getItem(CURRENT_SELECTED_TICKERS);
@@ -414,6 +419,7 @@ export default {
     },
     selectedTicker() {
       this.graph = [];
+      nextTick(this.calculateGraphElementsMaxAmount);
     },
     queryOptions() {
       this.updateQueryURL();
